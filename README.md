@@ -604,7 +604,7 @@ sample content for the new pathway:
         "type": "hint",
         "dependencies": [],
         "title": "Worked solution",
-        "text": "To solve the formula $$ V = \\frac{1}{3} \\pi r^2 h $$ for the variable $$ h $$, we'll isolate $$ h $$ on one side of the equation.\\n Given the formula: \\n $$ V = \\frac{1}{3} \\pi r^2 h $$v \\n Let's solve for $$ h $$: \\n $$ V = \\frac{1}{3} \\pi r^2 h $$\\n $$ 3V = \\pi r^2 h $$\\n $$ \\frac{3V}{\\pi r^2} = h $$\\n $$ h = \\frac{3V}{\\pi r^2} $$\\n The formula for the volume of a cone is: \\n $$ V = \\frac{1}{3} \\pi r^2 h $$\\n The formula for the height of a cone is: \\n $$ h = \\frac{3V}{\\pi r^2} $$\\n Step 1: Multiply both sides by $$ \\frac{3}{\\pi r^2} $$ to isolate $$ h $$. \\n $$ \\frac{3V}{\\pi r^2} = h $$ \\n So, the expression for $$ h $$ is: \\n $$ h = \\frac{3V}{\\pi r^2} $$ \\n This formula provides an expression for $$ h $$ in terms of the volume $$ V $$, the mathematical constant $$ \\pi $$, and the radius $$ r $$.", 
+        "text": "the worked solution is here", 
         "variabilization": {},
         "oer": "https://OATutor.io <OATutor>",
         "license": "https://creativecommons.org/licenses/by/4.0/ <CC BY 4.0>"
