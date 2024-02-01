@@ -598,6 +598,7 @@ content-sources/
     ├── ...
 ```
 sample content for the new pathway:
+```json5
 [
     {
         "id": "circle1aNewPathway-h1",
@@ -610,3 +611,4 @@ sample content for the new pathway:
         "license": "https://creativecommons.org/licenses/by/4.0/ <CC BY 4.0>"
     }
 ]
+```
