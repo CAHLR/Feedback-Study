@@ -17,6 +17,8 @@ import {
 } from "../../platform-logic/renderText.js";
 import {
     DYNAMIC_HINT_URL,
+    DYNAMIC_FEEDBACK_URL,
+    DYNAMIC_FIXING_URL,
     DYNAMIC_HINT_TEMPLATE,
     ENABLE_BOTTOM_OUT_HINTS,
     ThemeContext,
@@ -33,6 +35,9 @@ import {
 } from "./ToastNotifyCorrectness";
 import { joinList } from "../../util/formListString";
 import axios from "axios";
+import Completion from "../../models/OpenAI/Completion";
+import { ThreeSixty } from "@material-ui/icons";
+import KeyStrokeLogger from "../../components/keystroke/useKeyStrokeLogging.jsx";
 
 class ProblemCard extends React.Component {
     static contextType = ThemeContext;
@@ -50,7 +55,7 @@ class ProblemCard extends React.Component {
         this.allowRetry = this.giveStuFeedback;
 
         this.giveStuBottomHint = props.giveStuBottomHint;
-        this.giveDynamicHint = props.giveDynamicHint;
+        this.giveDynamicHint = props.dynamicHintTypes?.includes("general");
         this.showHints = this.giveStuHints == null || this.giveStuHints;
         this.showCorrectness = this.giveStuFeedback;
         this.expandFirstIncorrect = false;
@@ -61,7 +66,9 @@ class ProblemCard extends React.Component {
             ? props.prompt_template
             : DYNAMIC_HINT_TEMPLATE;
 
-        this.stepEvaluation = props.stepEvaluation;
+        this.stepFeedback = props.dynamicHintTypes?.includes("feedback");
+        this.stepFixing = props.dynamicHintTypes?.includes("fixing");
+        this.chooseAdventure = props.chooseAdventure;
 
         console.debug(
             "this.step",
@@ -71,24 +78,13 @@ class ProblemCard extends React.Component {
             "hintPathway",
             context.hintPathway
         );
-        this.hints = this.giveDynamicHint
-            ? []
-            : JSON.parse(JSON.stringify(this.step.hints[context.hintPathway]));
 
-        for (let hint of this.hints) {
-            hint.dependencies = hint.dependencies.map((dependency) =>
-                this._findHintId(this.hints, dependency)
-            );
-            if (hint.subHints) {
-                for (let subHint of hint.subHints) {
-                    subHint.dependencies = subHint.dependencies.map(
-                        (dependency) =>
-                            this._findHintId(hint.subHints, dependency)
-                    );
-                }
-            }
-        }
+        console.log("pathway: ", context.hintPathway);
+        console.log("see :", this.step);
 
+        this.hints = this.prepareHints("DefaultPathway");
+
+        this.bottomHint = [];
         // Bottom out hints option
         if (
             this.giveStuBottomHint &&
@@ -125,6 +121,7 @@ class ProblemCard extends React.Component {
                 }
                 return null;
             });
+            this.bottomHint = [this.hints[this.hints.length - 1]];
         }
 
         this.state = {
@@ -133,16 +130,38 @@ class ProblemCard extends React.Component {
             checkMarkOpacity:
                 context.use_expanded_view && context.debug ? "100" : "0",
             displayHints: false,
+            displayHintType: this.giveDynamicHint
+                ? "dynamic hint"
+                : "regular hint",
             hintsFinished: new Array(this.hints.length).fill(0),
             equation: "",
             usedHints: false,
             dynamicHint: "",
             bioInfo: "",
             student_steps: "",
-            dynamicEvaluation: "",
-            displayEvaluation: false,
+            dynamicFeedback: "",
+            dynamicFixing: "",
             enableHintGeneration: true,
         };
+
+        this.callback = this.callback.bind(this);
+        this.chat = new Completion(
+            {
+                model: "gpt-4",
+                temperature: 0,
+                maxTokens: 1000,
+            },
+            this.callback
+        );
+        this.chat.setApiKey(
+            "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"
+        );
+    }
+
+    callback(chunk) {
+        this.setState((prevState) => ({
+            dynamicHint: prevState.dynamicHint + chunk,
+        }));
     }
 
     _findHintId = (hints, targetId) => {
@@ -166,6 +185,15 @@ class ProblemCard extends React.Component {
     componentDidMount() {
         // Start an asynchronous task
         this.updateBioInfo();
+        // new KeyStrokeLogger({
+        //     textAreaRef: this.state.showyourworkRef,
+        //     submitButtonRef: this.state.submitButtonRef,
+        //     sessionId: 2023,
+        //     userId: 12345,
+        //     quizId: 1106,
+        //     endpoint: "http://localhost:8000", //local host of the fastAPI
+        //     token: "my_token", // key chain  third-party authentication  attach to the call to endpoint()
+        // });
         console.log("student show hints status: ", this.showHints);
     }
 
@@ -182,6 +210,25 @@ class ProblemCard extends React.Component {
             this.updateBioInfo();
         }
     }
+
+    prepareHints = (pathway) => {
+        let hints = JSON.parse(JSON.stringify(this.step.hints[pathway]));
+
+        for (let hint of hints) {
+            hint.dependencies = hint.dependencies.map((dependency) =>
+                this._findHintId(hints, dependency)
+            );
+            if (hint.subHints) {
+                for (let subHint of hint.subHints) {
+                    subHint.dependencies = subHint.dependencies.map(
+                        (dependency) =>
+                            this._findHintId(hint.subHints, dependency)
+                    );
+                }
+            }
+        }
+        return hints;
+    };
 
     submit = () => {
         console.debug("submitting problem");
@@ -272,37 +319,45 @@ class ProblemCard extends React.Component {
     toggleHints = (event) => {
         this.setState({
             enableHintGeneration: false,
+            displayHints: true,
         });
-        if (!this.state.displayHints) {
-            this.setState(
-                (prevState) => ({
-                    displayHints: !prevState.displayHints,
-                }),
-                () => {
-                    this.props.answerMade(
-                        this.index,
-                        this.step.knowledgeComponents,
-                        false
-                    );
-                }
-            );
-        }
+        this.setState(
+            () => ({
+                displayHintType: this.giveDynamicHint
+                    ? "dynamic hint"
+                    : "regular hint",
+            }),
+            () => {
+                this.props.answerMade(
+                    this.index,
+                    this.step.knowledgeComponents,
+                    false
+                );
+            }
+        );
         if (this.giveDynamicHint) {
             this.generateHintFromGPT();
         }
     };
 
-    toggleEvaluation = (event) => {
-        // this.setState({
-        //     enableHintGeneration: false,
-        // });
-        if (!this.state.displayEvaluation) {
-            this.setState((prevState) => ({
-                displayEvaluation: !prevState.displayEvaluation,
-            }));
-        }
-        if (this.stepEvaluation) {
-            this.generateEvaluationFromGPT();
+    toggleEvaluation = (event, hintType) => {
+        this.setState({
+            displayHintType: hintType,
+            displayHints: true,
+        });
+        console.log(hintType);
+        if (
+            hintType == "dynamic feedback" ||
+            hintType == "dynamic fixing" ||
+            hintType == "dynamic hint"
+        ) {
+            this.generateHintFromGPT(hintType);
+        } else if (hintType == "worked solution") {
+            this.hints = this.prepareHints("NewPathway");
+            console.log("hints: ", this.hints);
+        } else if (hintType == "regular hint") {
+            this.hints = this.prepareHints("DefaultPathway");
+            console.log("hints: ", this.hints);
         }
     };
 
@@ -431,7 +486,7 @@ class ProblemCard extends React.Component {
         return { quest, stud_submission: this.state.student_steps };
     };
 
-    generateHintFromGPT = async () => {
+    generateHintFromGPT = async (hintType) => {
         // console.log(this.generateGPTHintParameters(this.prompt_template));
         this.setState({
             dynamicHint: "",
@@ -455,18 +510,33 @@ class ProblemCard extends React.Component {
 
         const isCorrect = !!correctAnswer;
 
+        const url =
+            hintType == "dynamic hint"
+                ? DYNAMIC_HINT_URL
+                : hintType == "dynamic feedback"
+                ? DYNAMIC_FEEDBACK_URL
+                : DYNAMIC_FIXING_URL;
+        const parameters =
+            hintType == "dynamic hint"
+                ? this.generateGPTHintParameters(
+                      this.prompt_template,
+                      this.state.bioInfo
+                  )
+                : this.generateGPTEvaluationParameters();
+        const logType =
+            hintType == "dynamic hint"
+                ? "opened_hints"
+                : hintType == "dynamic feedback"
+                ? "feedback"
+                : "fixing";
         axios
-            .post(
-                DYNAMIC_HINT_URL,
-                this.generateGPTHintParameters(
-                    this.prompt_template,
-                    this.state.bioInfo
-                )
-            )
-            .then((response) => {
-                this.setState({
-                    dynamicHint: response.data.hint,
-                });
+            .post(url, parameters)
+            .then(async (response) => {
+                try {
+                    await this.chat.createResponse(response.data.prompt);
+                } catch (error) {
+                    console.error(error);
+                }
                 this.context.firebase.log(
                     parsed,
                     this.props.problemID,
@@ -485,50 +555,10 @@ class ProblemCard extends React.Component {
                     ),
                     this.props.lesson,
                     this.props.courseName,
-                    "dynamic",
+                    logType,
                     this.state.dynamicHint,
                     this.state.bioInfo
                 );
-            })
-            .catch((error) => {
-                console.error(error);
-            });
-    };
-
-    generateEvaluationFromGPT = async () => {
-        // console.log(this.generateGPTHintParameters(this.prompt_template));
-        this.setState({
-            dynamicEvaluation: "",
-        });
-        const [parsed, correctAnswer, reason] = checkAnswer({
-            attempt: this.state.inputVal,
-            actual: this.step.stepAnswer,
-            answerType: this.step.answerType,
-            precision: this.step.precision,
-            variabilization: chooseVariables(
-                Object.assign(
-                    {},
-                    this.props.problemVars,
-                    this.props.variabilization
-                ),
-                this.props.seed
-            ),
-            questionText:
-                this.step.stepBody.trim() || this.step.stepTitle.trim(),
-        });
-
-        const isCorrect = !!correctAnswer;
-
-        axios
-            .post(
-                "https://oatutor-backend.herokuapp.com/get_step_eval",
-                this.generateGPTEvaluationParameters()
-            )
-            .then((response) => {
-                console.log(response.data.prompt);
-                this.setState({
-                    dynamicEvaluation: response.data.evaluation,
-                });
             })
             .catch((error) => {
                 console.error(error);
@@ -543,7 +573,7 @@ class ProblemCard extends React.Component {
 
     render() {
         const { classes, problemID, problemVars, seed } = this.props;
-        const { displayHints, isCorrect } = this.state;
+        const { displayHints, displayHintType, isCorrect } = this.state;
         const { debug, use_expanded_view } = this.context;
 
         const problemAttempted = isCorrect != null;
@@ -583,38 +613,10 @@ class ProblemCard extends React.Component {
                             this.context
                         )}
                     </div>
-                    {this.state.displayEvaluation && this.stepEvaluation && (
+                    {displayHints && displayHintType == "dynamic feedback" && (
                         <div className="dynamicHintContainer">
                             <h3 className="dynamicHintTitle">
-                                Dynamic Evaluation
-                            </h3>
-                            {this.state.dynamicEvaluation ? (
-                                <div className="dynamicHintContent">
-                                    {renderText(
-                                        this.state.dynamicEvaluation,
-                                        problemID,
-                                        chooseVariables(
-                                            Object.assign(
-                                                {},
-                                                problemVars,
-                                                this.step.variabilization
-                                            ),
-                                            seed
-                                        ),
-                                        this.context
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="dynamicHintContent">
-                                    loading...
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    {displayHints && this.giveDynamicHint && (
-                        <div className="dynamicHintContainer">
-                            <h3 className="dynamicHintTitle">
-                                Hint From ChatGPT
+                                Dynamic Feedback
                             </h3>
                             {this.state.dynamicHint ? (
                                 <div className="dynamicHintContent">
@@ -639,7 +641,70 @@ class ProblemCard extends React.Component {
                             )}
                         </div>
                     )}
-                    {(displayHints || (debug && use_expanded_view)) &&
+                    {displayHints && displayHintType == "dynamic fixing" && (
+                        <div className="dynamicHintContainer">
+                            <h3 className="dynamicHintTitle">Dynamic Fixing</h3>
+                            {this.state.dynamicHint ? (
+                                <div className="dynamicHintContent">
+                                    {renderText(
+                                        this.state.dynamicHint,
+                                        problemID,
+                                        chooseVariables(
+                                            Object.assign(
+                                                {},
+                                                problemVars,
+                                                this.step.variabilization
+                                            ),
+                                            seed
+                                        ),
+                                        this.context
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="dynamicHintContent">
+                                    loading...
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {displayHints && displayHintType == "dynamic hint" && (
+                        <div className="dynamicHintContainer">
+                            <h3 className="dynamicHintTitle">
+                                Hint From ChatGPT
+                            </h3>
+                            {this.state.dynamicHint ? (
+                                <div className="dynamicHintContent">
+                                    {renderText(
+                                        this.state.dynamicHint
+                                            .split("\n")
+                                            .map((line, i) => (
+                                                <p key={`line-${i + 1}`}>
+                                                    {line}
+                                                </p>
+                                            )),
+                                        problemID,
+                                        chooseVariables(
+                                            Object.assign(
+                                                {},
+                                                problemVars,
+                                                this.step.variabilization
+                                            ),
+                                            seed
+                                        ),
+                                        this.context
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="dynamicHintContent">
+                                    loading...
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {((displayHints &&
+                        (displayHintType == "regular hint" ||
+                            displayHintType == "worked solution")) ||
+                        (debug && use_expanded_view)) &&
                         this.showHints && (
                             <div className="Hints">
                                 <ErrorBoundary
@@ -650,7 +715,6 @@ class ProblemCard extends React.Component {
                                         giveHintOnIncorrect={
                                             this.giveHintOnIncorrect
                                         }
-                                        giveDynamicHint={this.giveDynamicHint}
                                         giveStuFeedback={this.giveStuFeedback}
                                         unlockFirstHint={this.unlockFirstHint}
                                         problemID={this.props.problemID}
@@ -676,69 +740,392 @@ class ProblemCard extends React.Component {
                             </div>
                         )}
 
-                    {this.stepEvaluation ? (
+                    {displayHints &&
+                        displayHintType != "regular hint" &&
+                        this.giveStuBottomHint &&
+                        this.showHints && (
+                            <div className="Hints">
+                                <ErrorBoundary
+                                    componentName={"HintSystem"}
+                                    descriptor={"hint"}
+                                >
+                                    <HintSystem
+                                        giveHintOnIncorrect={
+                                            this.giveHintOnIncorrect
+                                        }
+                                        giveDynamicHint={this.giveDynamicHint}
+                                        giveStuFeedback={this.giveStuFeedback}
+                                        unlockFirstHint={this.unlockFirstHint}
+                                        problemID={this.props.problemID}
+                                        index={this.props.index}
+                                        step={this.step}
+                                        hints={this.bottomHint}
+                                        unlockHint={this.unlockHint}
+                                        hintStatus={this.state.hintsFinished}
+                                        submitHint={this.submitHint}
+                                        seed={this.props.seed}
+                                        stepVars={Object.assign(
+                                            {},
+                                            this.props.problemVars,
+                                            this.step.variabilization
+                                        )}
+                                        answerMade={this.props.answerMade}
+                                        lesson={this.props.lesson}
+                                        courseName={this.props.courseName}
+                                        isIncorrect={this.expandFirstIncorrect}
+                                    />
+                                </ErrorBoundary>
+                                <Spacer />
+                            </div>
+                        )}
+
+                    {this.chooseAdventure ? (
                         <div
                             style={{
                                 padding: "0.8rem",
                                 display: "flex",
-                                flexDirection: "row",
+                                flexDirection: "column",
+                                alignItems: "start",
                             }}
                         >
-                            <div style={{ width: "60%" }}>
-                                <span>Show your steps</span>
-                                <textarea
-                                    type="text"
-                                    // value={userInput}
-                                    onChange={this.handleStudStepsChange}
-                                    placeholder="Type something here..."
+                            <div
+                                style={{
+                                    display: "flex",
+                                    width: "100%",
+                                    flexDirection: "row",
+                                }}
+                            >
+                                <div style={{ width: "60%" }}>
+                                    <span>Show your steps</span>
+                                    {/* <math-field
+                                        // ref={this.mathliveRef}
+                                        onChange={this.handleStudStepsChange}
+                                        onInput={(evt) =>
+                                            this.props.setInputValState(
+                                                evt.target.value
+                                            )
+                                        }
+                                        style={{ display: "block" }}
+                                    ></math-field> */}
+                                    <textarea
+                                        ref={this.state.showyourworkRef}
+                                        type="text"
+                                        onChange={this.handleStudStepsChange}
+                                        placeholder="Type something here..."
+                                        style={{
+                                            width: "100%",
+                                            padding: "1rem",
+                                            minHeight: "20vh",
+                                            border: "2px solid orange",
+                                        }}
+                                    />
+                                </div>
+                                <div
                                     style={{
-                                        width: "100%",
-                                        padding: "1rem",
-                                        minHeight: "20vh",
+                                        width: "40%",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
                                     }}
-                                />
-                                <Button
-                                    onClick={this.toggleEvaluation}
-                                    className={classes.button}
-                                    style={{ width: "40%" }}
-                                    size="small"
                                 >
-                                    Check your steps
-                                </Button>
+                                    <span>Final Answer</span>
+                                    <ProblemInput
+                                        variabilization={chooseVariables(
+                                            Object.assign(
+                                                {},
+                                                this.props.problemVars,
+                                                this.step.variabilization
+                                            ),
+                                            this.props.seed
+                                        )}
+                                        allowRetry={this.allowRetry}
+                                        giveStuFeedback={this.giveStuFeedback}
+                                        showCorrectness={this.showCorrectness}
+                                        classes={classes}
+                                        state={this.state}
+                                        step={this.step}
+                                        seed={this.props.seed}
+                                        _setState={(state) =>
+                                            this.setState(state)
+                                        }
+                                        context={this.context}
+                                        editInput={this.editInput}
+                                        setInputValState={this.setInputValState}
+                                        handleKey={this.handleKey}
+                                        index={this.props.index}
+                                    />
+                                </div>
                             </div>
                             <div
                                 style={{
-                                    width: "40%",
+                                    width: "100%",
                                     display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
+                                    flexDirection: "row",
+                                    flexWrap: "wrap",
+                                    gap: "1rem",
                                 }}
                             >
-                                <span>Final Answer</span>
-                                <ProblemInput
-                                    variabilization={chooseVariables(
-                                        Object.assign(
-                                            {},
-                                            this.props.problemVars,
-                                            this.step.variabilization
-                                        ),
-                                        this.props.seed
-                                    )}
-                                    allowRetry={this.allowRetry}
-                                    giveStuFeedback={this.giveStuFeedback}
-                                    showCorrectness={this.showCorrectness}
-                                    classes={classes}
-                                    state={this.state}
-                                    step={this.step}
-                                    seed={this.props.seed}
-                                    _setState={(state) => this.setState(state)}
-                                    context={this.context}
-                                    editInput={this.editInput}
-                                    setInputValState={this.setInputValState}
-                                    handleKey={this.handleKey}
-                                    index={this.props.index}
-                                />
+                                <div className="button-group">
+                                    <Button
+                                        onClick={(event) =>
+                                            this.toggleEvaluation(
+                                                event,
+                                                "dynamic feedback"
+                                            )
+                                        }
+                                        className="inner-button"
+                                        style={{
+                                            width: "10rem",
+                                            marginTop: "0.8rem",
+                                            backgroundColor: "orange",
+                                        }}
+                                        size="small"
+                                    >
+                                        Get Feedback
+                                    </Button>
+                                    <div className="button-text">
+                                        hints focuses on positive aspects of
+                                        your progress
+                                    </div>
+                                </div>
+                                <div className="button-group">
+                                    <Button
+                                        onClick={(event) =>
+                                            this.toggleEvaluation(
+                                                event,
+                                                "dynamic fixing"
+                                            )
+                                        }
+                                        className={classes.button}
+                                        style={{
+                                            width: "10rem",
+                                            marginTop: "0.8rem",
+                                            backgroundColor: "orange",
+                                        }}
+                                        size="small"
+                                    >
+                                        Get Fixing
+                                    </Button>
+                                    <div className="button-text">
+                                        hints focuses on incorrect aspects of
+                                        your progress
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={(event) =>
+                                        this.toggleEvaluation(
+                                            event,
+                                            "regular hint"
+                                        )
+                                    }
+                                    className={classes.button}
+                                    style={{
+                                        width: "10rem",
+                                        marginTop: "0.8rem",
+                                    }}
+                                    size="small"
+                                >
+                                    MANUAL HINTS
+                                </Button>
+                                <Button
+                                    onClick={(event) =>
+                                        this.toggleEvaluation(
+                                            event,
+                                            "dynamic hint"
+                                        )
+                                    }
+                                    className={classes.button}
+                                    style={{
+                                        width: "10rem",
+                                        marginTop: "0.8rem",
+                                    }}
+                                    size="small"
+                                >
+                                    OPEN ENDED HINTS
+                                </Button>
+                                <Button
+                                    onClick={(event) =>
+                                        this.toggleEvaluation(
+                                            event,
+                                            "worked solution"
+                                        )
+                                    }
+                                    className={classes.button}
+                                    style={{
+                                        width: "10rem",
+                                        marginTop: "0.8rem",
+                                    }}
+                                    size="small"
+                                >
+                                    Worked Solution
+                                </Button>
+                            </div>
+                        </div>
+                    ) : this.stepFeedback ? (
+                        <div
+                            style={{
+                                padding: "0.8rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "start",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    width: "100%",
+                                    flexDirection: "row",
+                                }}
+                            >
+                                <div style={{ width: "60%" }}>
+                                    <span>Show your work</span>
+                                    <textarea
+                                        type="text"
+                                        onChange={this.handleStudStepsChange}
+                                        placeholder="Type something here..."
+                                        style={{
+                                            width: "100%",
+                                            padding: "1rem",
+                                            minHeight: "20vh",
+                                        }}
+                                    />
+                                    <Button
+                                        onClick={(event) =>
+                                            this.toggleEvaluation(
+                                                event,
+                                                "dynamic feedback"
+                                            )
+                                        }
+                                        className={classes.button}
+                                        style={{
+                                            width: "10rem",
+                                            marginTop: "0.8rem",
+                                        }}
+                                        size="small"
+                                    >
+                                        Get Feedback
+                                    </Button>
+                                </div>
+                                <div
+                                    style={{
+                                        width: "40%",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <span>Final Answer</span>
+                                    <ProblemInput
+                                        variabilization={chooseVariables(
+                                            Object.assign(
+                                                {},
+                                                this.props.problemVars,
+                                                this.step.variabilization
+                                            ),
+                                            this.props.seed
+                                        )}
+                                        allowRetry={this.allowRetry}
+                                        giveStuFeedback={this.giveStuFeedback}
+                                        showCorrectness={this.showCorrectness}
+                                        classes={classes}
+                                        state={this.state}
+                                        step={this.step}
+                                        seed={this.props.seed}
+                                        _setState={(state) =>
+                                            this.setState(state)
+                                        }
+                                        context={this.context}
+                                        editInput={this.editInput}
+                                        setInputValState={this.setInputValState}
+                                        handleKey={this.handleKey}
+                                        index={this.props.index}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : this.stepFixing ? (
+                        <div
+                            style={{
+                                padding: "0.8rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "start",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    width: "100%",
+                                    flexDirection: "row",
+                                }}
+                            >
+                                <div style={{ width: "60%" }}>
+                                    <span>Show your steps</span>
+                                    <textarea
+                                        type="text"
+                                        onChange={this.handleStudStepsChange}
+                                        placeholder="Type something here..."
+                                        style={{
+                                            width: "100%",
+                                            padding: "1rem",
+                                            minHeight: "20vh",
+                                        }}
+                                    />
+                                    <Button
+                                        onClick={(event) =>
+                                            this.toggleEvaluation(
+                                                event,
+                                                "dynamic feedback"
+                                            )
+                                        }
+                                        className={classes.button}
+                                        style={{
+                                            width: "10rem",
+                                            marginTop: "0.8rem",
+                                        }}
+                                        size="small"
+                                    >
+                                        Get Fixing
+                                    </Button>
+                                </div>
+                                <div
+                                    style={{
+                                        width: "40%",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <span>Final Answer</span>
+                                    <ProblemInput
+                                        variabilization={chooseVariables(
+                                            Object.assign(
+                                                {},
+                                                this.props.problemVars,
+                                                this.step.variabilization
+                                            ),
+                                            this.props.seed
+                                        )}
+                                        allowRetry={this.allowRetry}
+                                        giveStuFeedback={this.giveStuFeedback}
+                                        showCorrectness={this.showCorrectness}
+                                        classes={classes}
+                                        state={this.state}
+                                        step={this.step}
+                                        seed={this.props.seed}
+                                        _setState={(state) =>
+                                            this.setState(state)
+                                        }
+                                        context={this.context}
+                                        editInput={this.editInput}
+                                        setInputValState={this.setInputValState}
+                                        handleKey={this.handleKey}
+                                        index={this.props.index}
+                                    />
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -778,7 +1165,7 @@ class ProblemCard extends React.Component {
                     >
                         <Grid item xs={false} sm={false} md={4} />
                         <Grid item xs={4} sm={4} md={1}>
-                            {this.showHints && (
+                            {this.showHints && !this.chooseAdventure && (
                                 <center>
                                     <IconButton
                                         aria-label="delete"
@@ -816,6 +1203,7 @@ class ProblemCard extends React.Component {
                                         (use_expanded_view && debug) ||
                                         (!this.allowRetry && problemAttempted)
                                     }
+                                    ref={this.state.submitButtonRef}
                                     {...stagingProp({
                                         "data-selenium-target": `submit-button-${this.props.index}`,
                                     })}

@@ -86,7 +86,21 @@ const MIDDLEWARE_URL =
 const HELP_DOCUMENT =
     "https://docs.google.com/document/d/e/2PACX-1vToe2F3RiCx1nwcX9PEkMiBA2bFy9lQRaeWIbyqlc8W_KJ9q-hAMv34QaO_AdEelVY7zjFAF1uOP4pG/pub";
 
-const DYNAMIC_HINT_URL = "https://oatutor-backend.herokuapp.com/get_hint";
+// const DYNAMIC_HINT_URL = "https://oatutor-backend.herokuapp.com/get_hint";
+
+// const DYNAMIC_FEEDBACK_URL = "https://oatutor-backend.herokuapp.com/get_step_feedback";
+
+// const DYNAMIC_FIXING_URL =
+//     "https://oatutor-backend.herokuapp.com/get_step_fixing";
+
+const DYNAMIC_HINT_URL =
+    "https://oatutor-backend.herokuapp.com/get_open_prompt";
+
+const DYNAMIC_FEEDBACK_URL =
+    "https://oatutor-backend.herokuapp.com/get_feedback_prompt";
+
+const DYNAMIC_FIXING_URL =
+    "https://oatutor-backend.herokuapp.com/get_fixing_prompt";
 
 const DYNAMIC_HINT_TEMPLATE =
     "<{problem_title}.> <{problem_subtitle}.> <{question_title}.> <{question_subtitle}.> <Student's answer is: {student_answer}.> <The correct answer is: {correct_answer}.> Please give a hint for this.";
@@ -137,6 +151,8 @@ export {
     EQUATION_EDITOR_AUTO_OPERATORS,
     MIDDLEWARE_URL,
     DYNAMIC_HINT_URL,
+    DYNAMIC_FEEDBACK_URL,
+    DYNAMIC_FIXING_URL,
     DYNAMIC_HINT_TEMPLATE,
     USER_ID_STORAGE_KEY,
     PROGRESS_STORAGE_KEY,
