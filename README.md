@@ -45,8 +45,8 @@ The installation assumes that you already have Git, Node.js, and npm installed.
 ## Installation
 
 ```sh
-git clone --recurse-submodules https://github.com/CAHLR/OATutor-DynamicHint-Support.git
-cd OATutor
+git clone --recurse-submodules https://github.com/CAHLR/DynamicHint-Dev.git
+cd DynamicHint-Dev
 ```
 
 ### Dependencies
