@@ -563,3 +563,50 @@ masteries together to get the problem mastery. The heuristic will be applied, wh
 first, so the problem with the lowest mastery is selected to give to the user. In the case that the first problem is
 being chosen in the session, equation a from the BKT model is used and the default probMastery is considered the user's
 mastery. Ties (of equal mastery) in the heuristic selection algorithm are broken by randomly choosing a problem.
+
+### Enable dynamic Hint
+
+To enable dynamic hint, you can go to coursePlan.json file. In each lesson, attach the "dynamicHintTypes": ["someType"] to
+the lesson. "someType" can be "general", "feedback", and "fixing", with each of them representing the open-ended hints, hints
+focus on positive aspects of progress in the show your work, hints focus on the critical aspects of the progress in show your
+work box. 
+
+#### Bottom Out Hint
+Bottom out hint (the answer) is by default as attached to the bottom of the dynamic hint. To disable it, attach 
+"allowBottomHint": false to the lesson. 
+
+#### Choose your adventure
+Choose your adventure feature allows students choose the hint for the problem, which can be feedback, fixing, open-ended, manual
+hints, and worked solutions. To enable choose your adventure, attach "dynamicHintTypes": ["general", "feedback", "fixing"] and
+"chooseAdventure": true to the lesson. Additionally, make sure all of problems involved in the lesson with choose your adventure feature
+have included a new hint pathway for the worked solution. The example structure is here: 
+```
+content-sources/
+└── oatutor [submodule]/
+    ├── content-pool/
+    │   ├── circle1/
+    │   │   ├── circle1.json
+    │   │   └── steps/
+    │   │       ├── circle1a/
+    │   │           ├── circle1a.json
+    │   │           └── tutoring/
+    │   │               ├── circle1aDefaultPathway.json
+    │   │               └── circle1aNewPathway.json  <--- Add your new pathway here
+    │   └── slope1/
+    │       ├── slope1.json
+    │       └── ...
+    ├── ...
+```
+sample content for the new pathway:
+[
+    {
+        "id": "circle1aNewPathway-h1",
+        "type": "hint",
+        "dependencies": [],
+        "title": "Worked solution",
+        "text": "To solve the formula $$ V = \\frac{1}{3} \\pi r^2 h $$ for the variable $$ h $$, we'll isolate $$ h $$ on one side of the equation.\\n Given the formula: \\n $$ V = \\frac{1}{3} \\pi r^2 h $$v \\n Let's solve for $$ h $$: \\n $$ V = \\frac{1}{3} \\pi r^2 h $$\\n $$ 3V = \\pi r^2 h $$\\n $$ \\frac{3V}{\\pi r^2} = h $$\\n $$ h = \\frac{3V}{\\pi r^2} $$\\n The formula for the volume of a cone is: \\n $$ V = \\frac{1}{3} \\pi r^2 h $$\\n The formula for the height of a cone is: \\n $$ h = \\frac{3V}{\\pi r^2} $$\\n Step 1: Multiply both sides by $$ \\frac{3}{\\pi r^2} $$ to isolate $$ h $$. \\n $$ \\frac{3V}{\\pi r^2} = h $$ \\n So, the expression for $$ h $$ is: \\n $$ h = \\frac{3V}{\\pi r^2} $$ \\n This formula provides an expression for $$ h $$ in terms of the volume $$ V $$, the mathematical constant $$ \\pi $$, and the radius $$ r $$.", 
+        "variabilization": {},
+        "oer": "https://OATutor.io <OATutor>",
+        "license": "https://creativecommons.org/licenses/by/4.0/ <CC BY 4.0>"
+    }
+]
