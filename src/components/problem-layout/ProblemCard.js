@@ -22,6 +22,7 @@ import {
     DYNAMIC_HINT_TEMPLATE,
     ENABLE_BOTTOM_OUT_HINTS,
     ThemeContext,
+    OPENAI_KEY,
 } from "../../config/config.js";
 
 import "./ProblemCard.css";
@@ -153,9 +154,8 @@ class ProblemCard extends React.Component {
             },
             this.callback
         );
-        this.chat.setApiKey(
-            "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"
-        );
+        this.key = this.decode(OPENAI_KEY);
+        this.chat.setApiKey(this.key);
     }
 
     callback(chunk) {
@@ -314,6 +314,14 @@ class ProblemCard extends React.Component {
         if (event.key === "Enter") {
             this.submit();
         }
+    };
+
+    decode = (value) => {
+        let decoded = "";
+        for (let i = 0; i < value.length; i++) {
+            decoded += String.fromCharCode(value.charCodeAt(i) - 1);
+        }
+        return decoded;
     };
 
     toggleHints = (event) => {

@@ -6,7 +6,7 @@ class Completion {
     constructor(config, callback) {
         if (!COMPLETION_MODELS.includes(config.model)) {
             throw new BadRequestError(`
-        Unknown model. 
+        Unknown model.
         Check the spelling of your input.
         If you feel this is an error, open an issue on our Github repo:
       `);
