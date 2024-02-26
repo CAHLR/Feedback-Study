@@ -567,7 +567,7 @@ mastery. Ties (of equal mastery) in the heuristic selection algorithm are broken
 ### Enable dynamic Hint
 
 To enable dynamic hint, you can go to coursePlan.json file. In each lesson, attach the "dynamicHintTypes": ["someType"] to
-the lesson. "someType" can be "general", "feedback", and "fixing", with each of them representing the open-ended hints, hints
+the lesson. "someType" can be "general" and "feedback", with each of them representing the open-ended hints, hints
 focus on positive aspects of progress in the show your work, hints focus on the critical aspects of the progress in show your
 work box. 
 
@@ -576,8 +576,8 @@ Bottom out hint (the answer) is by default as attached to the bottom of the dyna
 "allowBottomHint": false to the lesson. 
 
 #### Choose your adventure
-Choose your adventure feature allows students choose the hint for the problem, which can be feedback, fixing, open-ended, manual
-hints, and worked solutions. To enable choose your adventure, attach "dynamicHintTypes": ["general", "feedback", "fixing"] and
+Choose your adventure feature allows students choose the hint for the problem, which can be feedback, open-ended, manual
+hints, and worked solutions. To enable choose your adventure, attach "dynamicHintTypes": ["general", "feedback"] and
 "chooseAdventure": true to the lesson. Additionally, make sure all of problems involved in the lesson with choose your adventure feature
 have included a new hint pathway for the worked solution. The example structure is here: 
 ```
