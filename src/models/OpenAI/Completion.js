@@ -3,15 +3,16 @@ import { COMPLETION_MODELS } from "./completionModels";
 import parse from "../../util/parse";
 
 class Completion {
-    constructor(config, callback) {
+    constructor(config, addChunkCallback, setFinishedCallback) {
         if (!COMPLETION_MODELS.includes(config.model)) {
             throw new BadRequestError(`
-        Unknown model.
+        Unknown model. 
         Check the spelling of your input.
         If you feel this is an error, open an issue on our Github repo:
       `);
         }
-        this.callback = callback;
+        this.addChunkCallback = addChunkCallback;
+        this.setFinishedCallback = setFinishedCallback;
         this.decoder = new TextDecoder("utf-8");
         this.API_URL = "https://api.openai.com/v1/chat/completions";
 
@@ -54,6 +55,7 @@ class Completion {
                 const { done, value } = await reader.read();
                 done ? (isStreaming = false) : this._addValue(value);
             }
+            this.setFinishedCallback();
         } catch (e) {
             console.error(e);
         }
@@ -96,7 +98,7 @@ class Completion {
         for (let line of lines) {
             const { content } = line.choices[0].delta;
             if (content) {
-                this.callback(content);
+                this.addChunkCallback(content);
                 chunk += content;
             }
         }

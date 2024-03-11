@@ -37,6 +37,7 @@ import {
 import { joinList } from "../../util/formListString";
 import axios from "axios";
 import Completion from "../../models/OpenAI/Completion";
+import BlinkingCursor from "@components/BlinkingCursor.js";
 import { ThreeSixty } from "@material-ui/icons";
 import KeyStrokeLogger from "../../components/keystroke/useKeyStrokeLogging.jsx";
 
@@ -80,8 +81,8 @@ class ProblemCard extends React.Component {
             context.hintPathway
         );
 
-        console.log("pathway: ", context.hintPathway);
-        console.log("see :", this.step);
+        // console.log("pathway: ", context.hintPathway);
+        // console.log("see :", this.step);
 
         this.hints = this.prepareHints("DefaultPathway");
 
@@ -138,30 +139,40 @@ class ProblemCard extends React.Component {
             equation: "",
             usedHints: false,
             dynamicHint: "",
-            bioInfo: "",
-            student_steps: "",
+            studentProgress: "",
             dynamicFeedback: "",
             dynamicFixing: "",
             enableHintGeneration: true,
+            dynamicHintGenerationFinished: false,
         };
 
-        this.callback = this.callback.bind(this);
+        this.addChunkCallback = this.addChunkCallback.bind(this);
+        this.setHintFinishCallback = this.setHintFinishCallback.bind(this);
         this.chat = new Completion(
             {
                 model: "gpt-4",
                 temperature: 0,
                 maxTokens: 1000,
             },
-            this.callback
+            this.addChunkCallback,
+            this.setHintFinishCallback
         );
         this.key = this.decode(OPENAI_KEY);
         this.chat.setApiKey(this.key);
     }
 
-    callback(chunk) {
+    addChunkCallback(chunk) {
         this.setState((prevState) => ({
             dynamicHint: prevState.dynamicHint + chunk,
         }));
+    }
+
+    setHintFinishCallback() {
+        // this.blinkRef.setVisibility(false);
+        this.setState((prevState) => ({
+            dynamicHintGenerationFinished: true,
+        }));
+        console.log("hint is finished");
     }
 
     _findHintId = (hints, targetId) => {
@@ -194,7 +205,7 @@ class ProblemCard extends React.Component {
         //     endpoint: "http://localhost:8000", //local host of the fastAPI
         //     token: "my_token", // key chain  third-party authentication  attach to the call to endpoint()
         // });
-        console.log("student show hints status: ", this.showHints);
+        // console.log("student show hints status: ", this.showHints);
     }
 
     componentDidUpdate(prevProps) {
@@ -278,9 +289,9 @@ class ProblemCard extends React.Component {
             ),
             lesson,
             courseName,
-            this.giveDynamicHint ? "dynamic" : "regular",
+            this.state.displayHintType,
             this.state.dynamicHint,
-            this.state.bioInfo
+            this.state.studentProgress
         );
 
         if (this.showCorrectness) {
@@ -327,6 +338,7 @@ class ProblemCard extends React.Component {
     toggleHints = (event) => {
         this.setState({
             enableHintGeneration: false,
+            dynamicHintGenerationFinished: false,
             displayHints: true,
         });
         this.setState(
@@ -352,6 +364,7 @@ class ProblemCard extends React.Component {
         this.setState({
             displayHintType: hintType,
             displayHints: true,
+            dynamicHintGenerationFinished: false,
         });
         console.log(hintType);
         if (
@@ -406,9 +419,9 @@ class ProblemCard extends React.Component {
                         ),
                         lesson,
                         courseName,
-                        this.giveDynamicHint ? "dynamic" : "regular",
+                        this.state.displayHintType,
                         this.state.dynamicHint,
-                        this.state.bioInfo
+                        this.state.studentProgress
                     );
                 }
             );
@@ -441,7 +454,7 @@ class ProblemCard extends React.Component {
             this.props.courseName,
             this.giveDynamicHint ? "dynamic" : "regular",
             this.state.dynamicHint,
-            this.state.bioInfo
+            this.state.studentProgress
         );
     };
 
@@ -491,7 +504,7 @@ class ProblemCard extends React.Component {
             correct_answer: correctAnswer,
         };
 
-        return { quest, stud_submission: this.state.student_steps };
+        return { quest, stud_submission: this.state.studentProgress };
     };
 
     generateHintFromGPT = async (hintType) => {
@@ -528,15 +541,15 @@ class ProblemCard extends React.Component {
             hintType == "dynamic hint"
                 ? this.generateGPTHintParameters(
                       this.prompt_template,
-                      this.state.bioInfo
+                      this.state.studentProgress
                   )
                 : this.generateGPTEvaluationParameters();
-        const logType =
-            hintType == "dynamic hint"
-                ? "opened_hints"
-                : hintType == "dynamic feedback"
-                ? "feedback"
-                : "fixing";
+        // const logType =
+        //     hintType == "dynamic hint"
+        //         ? "opened_hints"
+        //         : hintType == "dynamic feedback"
+        //         ? "feedback"
+        //         : "fixing";
         axios
             .post(url, parameters)
             .then(async (response) => {
@@ -563,9 +576,9 @@ class ProblemCard extends React.Component {
                     ),
                     this.props.lesson,
                     this.props.courseName,
-                    logType,
+                    this.state.displayHintType,
                     this.state.dynamicHint,
-                    this.state.bioInfo
+                    this.state.studentProgress
                 );
             })
             .catch((error) => {
@@ -575,7 +588,7 @@ class ProblemCard extends React.Component {
 
     handleStudStepsChange = (event) => {
         this.setState({
-            student_steps: event.target.value,
+            studentProgress: event.target.value,
         });
     };
 
@@ -641,6 +654,14 @@ class ProblemCard extends React.Component {
                                         ),
                                         this.context
                                     )}
+                                    {!this.state
+                                        .dynamicHintGenerationFinished && (
+                                        <BlinkingCursor
+                                            ref={(blinkRef) => {
+                                                this.blinkRef = blinkRef;
+                                            }}
+                                        />
+                                    )}
                                 </div>
                             ) : (
                                 <div className="dynamicHintContent">
@@ -666,6 +687,14 @@ class ProblemCard extends React.Component {
                                             seed
                                         ),
                                         this.context
+                                    )}
+                                    {!this.state
+                                        .dynamicHintGenerationFinished && (
+                                        <BlinkingCursor
+                                            ref={(blinkRef) => {
+                                                this.blinkRef = blinkRef;
+                                            }}
+                                        />
                                     )}
                                 </div>
                             ) : (
@@ -700,6 +729,14 @@ class ProblemCard extends React.Component {
                                             seed
                                         ),
                                         this.context
+                                    )}
+                                    {!this.state
+                                        .dynamicHintGenerationFinished && (
+                                        <BlinkingCursor
+                                            ref={(blinkRef) => {
+                                                this.blinkRef = blinkRef;
+                                            }}
+                                        />
                                     )}
                                 </div>
                             ) : (
@@ -865,15 +902,7 @@ class ProblemCard extends React.Component {
                                     />
                                 </div>
                             </div>
-                            <div
-                                style={{
-                                    width: "100%",
-                                    display: "flex",
-                                    flexDirection: "row",
-                                    flexWrap: "wrap",
-                                    gap: "1rem",
-                                }}
-                            >
+                            <div className="showyourworkAllGroup">
                                 <div className="button-group">
                                     <Button
                                         onClick={(event) =>
@@ -890,11 +919,10 @@ class ProblemCard extends React.Component {
                                         }}
                                         size="small"
                                     >
-                                        Get Feedback
+                                        AI Feedback
                                     </Button>
                                     <div className="button-text">
-                                        hints focuses on positive aspects of
-                                        your progress
+                                        Get AI feedback on your work!
                                     </div>
                                 </div>
                                 <div className="button-group">
@@ -902,72 +930,65 @@ class ProblemCard extends React.Component {
                                         onClick={(event) =>
                                             this.toggleEvaluation(
                                                 event,
-                                                "dynamic fixing"
+                                                "dynamic hint"
                                             )
                                         }
                                         className={classes.button}
                                         style={{
                                             width: "10rem",
                                             marginTop: "0.8rem",
-                                            backgroundColor: "orange",
                                         }}
                                         size="small"
                                     >
-                                        Get Fixing
+                                        AI Hint
                                     </Button>
                                     <div className="button-text">
-                                        hints focuses on incorrect aspects of
-                                        your progress
+                                        Get an AI hint!
                                     </div>
                                 </div>
-                                <Button
-                                    onClick={(event) =>
-                                        this.toggleEvaluation(
-                                            event,
-                                            "regular hint"
-                                        )
-                                    }
-                                    className={classes.button}
-                                    style={{
-                                        width: "10rem",
-                                        marginTop: "0.8rem",
-                                    }}
-                                    size="small"
-                                >
-                                    MANUAL HINTS
-                                </Button>
-                                <Button
-                                    onClick={(event) =>
-                                        this.toggleEvaluation(
-                                            event,
-                                            "dynamic hint"
-                                        )
-                                    }
-                                    className={classes.button}
-                                    style={{
-                                        width: "10rem",
-                                        marginTop: "0.8rem",
-                                    }}
-                                    size="small"
-                                >
-                                    OPEN ENDED HINTS
-                                </Button>
-                                <Button
-                                    onClick={(event) =>
-                                        this.toggleEvaluation(
-                                            event,
-                                            "worked solution"
-                                        )
-                                    }
-                                    className={classes.button}
-                                    style={{
-                                        width: "10rem",
-                                        marginTop: "0.8rem",
-                                    }}
-                                    size="small"
-                                >
-                                    Worked Solution
-                                </Button>
+                                <div className="button-group">
+                                    <Button
+                                        onClick={(event) =>
+                                            this.toggleEvaluation(
+                                                event,
+                                                "worked solution"
+                                            )
+                                        }
+                                        className={classes.button}
+                                        style={{
+                                            width: "10rem",
+                                            marginTop: "0.8rem",
+                                        }}
+                                        size="small"
+                                    >
+                                        AI Solution
+                                    </Button>
+                                    <div className="button-text">
+                                        See how an AI solves the problem!
+                                    </div>
+                                </div>
+                                <div className="button-group left-padding">
+                                    <Button
+                                        onClick={(event) =>
+                                            this.toggleEvaluation(
+                                                event,
+                                                "regular hint"
+                                            )
+                                        }
+                                        className={classes.button}
+                                        style={{
+                                            width: "10rem",
+                                            marginTop: "0.8rem",
+                                        }}
+                                        size="small"
+                                    >
+                                        Teacher Gudiance
+                                    </Button>
+                                    <div className="button-text">
+                                        See help for this problem written by a
+                                        teacher!
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     ) : this.stepFeedback ? (
@@ -996,24 +1017,31 @@ class ProblemCard extends React.Component {
                                             width: "100%",
                                             padding: "1rem",
                                             minHeight: "20vh",
+                                            border: "2px solid orange",
                                         }}
                                     />
-                                    <Button
-                                        onClick={(event) =>
-                                            this.toggleEvaluation(
-                                                event,
-                                                "dynamic feedback"
-                                            )
-                                        }
-                                        className={classes.button}
-                                        style={{
-                                            width: "10rem",
-                                            marginTop: "0.8rem",
-                                        }}
-                                        size="small"
-                                    >
-                                        Get Feedback
-                                    </Button>
+                                    <div className="button-group">
+                                        <Button
+                                            onClick={(event) =>
+                                                this.toggleEvaluation(
+                                                    event,
+                                                    "dynamic feedback"
+                                                )
+                                            }
+                                            className="inner-button"
+                                            style={{
+                                                width: "10rem",
+                                                marginTop: "0.8rem",
+                                                backgroundColor: "orange",
+                                            }}
+                                            size="small"
+                                        >
+                                            AI Feedback
+                                        </Button>
+                                        <div className="button-text">
+                                            Get AI feedback on your work!
+                                        </div>
+                                    </div>
                                 </div>
                                 <div
                                     style={{

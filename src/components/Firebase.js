@@ -216,7 +216,7 @@ class Firebase {
         courseName,
         hintType,
         dynamicHint,
-        bioInfo
+        studentProgress
     ) {
         if (!DO_LOG_DATA) {
             console.debug("Not using firebase for logging (2)");
@@ -244,7 +244,7 @@ class Firebase {
             knowledgeComponents: step?.knowledgeComponents,
             hintType,
             dynamicHint,
-            bioInfo,
+            studentProgress,
         };
         return this.writeData(GPTExperimentOutput, data);
         // return this.writeData(problemSubmissionsOutput, data);
@@ -262,7 +262,7 @@ class Firebase {
         courseName,
         hintType,
         dynamicHint,
-        bioInfo
+        studentProgress
     ) {
         if (!DO_LOG_DATA) return;
         console.debug("step", step);
@@ -279,14 +279,13 @@ class Firebase {
             hintIsCorrect: isCorrect,
             hintsFinished,
             dynamicHint: "abc",
-            bioInfo: "abcedf",
             variabilization,
             Content: courseName,
             lesson,
             knowledgeComponents: step?.knowledgeComponents,
             hintType,
             dynamicHint,
-            bioInfo,
+            studentProgress,
         };
         return this.writeData(GPTExperimentOutput, data);
         // return this.writeData(problemSubmissionsOutput, data);

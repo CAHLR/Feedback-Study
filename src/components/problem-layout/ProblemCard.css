@@ -68,3 +68,30 @@
 
 /* Change the background color of the dropdown button when the dropdown content is shown
 .button-group:hover .inner-button {background-color: #3e8e41;} */
+
+.showyourworkAllGroup {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 2vw;
+}
+
+@media screen and (max-width: 1260px) {
+    .showyourworkAllGroup {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+}
+
+.left-padding {
+    padding-left: 5vw;
+}
+
+@media screen and (max-width: 1260px) {
+    .left-padding {
+        padding-left: 0;
+    }
+}
